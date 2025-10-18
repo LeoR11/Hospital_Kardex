@@ -1,0 +1,124 @@
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    margin: 0;
+    background-color: #e9ecef;
+}
+
+/* --- ESTILOS LOGIN --- */
+.login-container {
+    background-color: #f8f9fa;
+    padding: 30px;
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    width: 350px;
+    margin: 15vh auto;
+    text-align: center;
+}
+.login-container h2 {
+    color: #495057;
+    margin-bottom: 25px;
+    font-weight: 400;
+}
+.login-container input {
+    width: 100%;
+    padding: 12px;
+    margin-bottom: 15px;
+    border: 1px solid #ced4da;
+    border-radius: 5px;
+    box-sizing: border-box;
+    font-size: 16px;
+}
+.botones-container {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    margin-top: 10px;
+}
+.botones-container button {
+    flex-grow: 1;
+    padding: 12px;
+    border: none;
+    border-radius: 5px;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+}
+#btn-cancelar { background-color: #e9ecef; color: #495057; }
+#btn-ingresar { background-color: #0d6efd; color: white; }
+#mensaje-error { color: #dc3545; margin-top: 15px; height: 1em; }
+
+
+/* --- ESTILOS PANEL PRINCIPAL --- */
+.panel-container {
+    display: flex;
+    height: 100vh;
+}
+.panel-navegacion {
+    width: 220px;
+    background-color: #f8f9fa;
+    padding-top: 20px;
+    display: flex;
+    flex-direction: column;
+}
+.nav-button {
+    width: 100%;
+    padding: 15px 20px;
+    border: none;
+    background-color: transparent;
+    text-align: left;
+    font-size: 16px;
+    color: #495057;
+    cursor: pointer;
+}
+.nav-button.active, .nav-button:hover {
+    background-color: #0d6efd;
+    color: white;
+}
+#btn-logout { margin-top: auto; margin-bottom: 20px;}
+
+.panel-contenido {
+    flex-grow: 1;
+    padding: 40px;
+    background-color: #ffffff;
+    overflow-y: auto;
+}
+.panel-contenido h1 {
+    font-size: 28px;
+    color: #212529;
+    margin-top: 0;
+}
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+}
+th, td {
+    padding: 15px;
+    text-align: left;
+    border-bottom: 1px solid #dee2e6;
+}
+thead {
+    background-color: #f8f9fa;
+    color: #495057;
+}
+.estado-bajo {
+    color: #dc3545;
+    font-weight: bold;
+}
+
+/* Nuevo contenedor para centrar todo verticalmente */
+.main-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-height: 100vh;
+}
+
+/* Estilos para el logo inferior */
+#logo-inferior {
+    margin-top: 25px; 
+    max-width: 200px; 
+    height: auto; 
+}

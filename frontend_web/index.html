@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Iniciar Sesión - Sistema Kardex</title>
+    <link rel="stylesheet" href="estilos.css">
+</head>
+<body>
+    <div class="main-container">
+        <div class="login-container">
+            <h2>Ingrese sus credenciales para acceder</h2>
+            <form id="formulario-login">
+                <input type="text" id="nombre_usuario" placeholder="Usuario" required>
+                <input type="password" id="clave" placeholder="Contraseña" required>
+                <div class="botones-container">
+                    <button type="button" id="btn-cancelar">Cancelar</button>
+                    <button type="submit" id="btn-ingresar">INGRESAR</button>
+                </div>
+                <p id="mensaje-error"></p>
+            </form>
+        </div>
+
+        <img src="Color_Minsal.png" alt="Logo Institucional" id="logo-inferior">
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
