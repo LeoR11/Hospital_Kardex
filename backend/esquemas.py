@@ -1,8 +1,9 @@
 from pydantic import BaseModel
-from modelos import RolUsuario, EstadoReceta
+from datetime import date, datetime
+from typing import List, Optional
+from modelos import RolUsuario, EstadoReceta, TipoTransaccion
 
-#ESQUEMAS DE USUARIOS
-
+# US8UARIOS
 
 class UsuarioCrear(BaseModel):
     nombre_usuario: str
@@ -21,49 +22,126 @@ class Token(BaseModel):
     access_token: str
     token_type: str
 
+#PROFESIONALES
 
-#ESQUEMAS DE RECETAS
+class ProfesionalBase(BaseModel):
+    nombre: str
+    run: str
+    profesion: str
 
+class ProfesionalCrear(ProfesionalBase):
+    pass
 
-class RecetaCrear(BaseModel):
-    id_paciente: str
-
-class Receta(RecetaCrear):
+class Profesional(ProfesionalBase):
     id: int
-    estado: EstadoReceta
 
     class Config:
         from_attributes = True
 
+#MEDICAMENTOS
 
-#ESQUEMAS DE MEDICAMENTOS
-
-class MedicamentoCrear(BaseModel):
+class MedicamentoBase(BaseModel):
     nombre: str
+    lote: str
+    fecha_vencimiento: date
     stock_actual: int
     umbral_minimo: int
 
-class Medicamento(MedicamentoCrear):
+class MedicamentoCrear(MedicamentoBase):
+    pass
+
+class Medicamento(MedicamentoBase):
     id: int
 
     class Config:
         from_attributes = True
 
-
-
-#ESQUEMAS DE DETALLES DE RECETA
-
-class DetalleReceta(BaseModel):
+# RECETAS
+class DetalleRecetaBase(BaseModel):
     medicamento_id: int
     cantidad: int
+
+class DetalleRecetaCrear(DetalleRecetaBase):
+    pass
+
+
+class RecetaBase(BaseModel):
+    id_paciente: str
+    fecha_emision: date
+    profesional_id: int
+
+class RecetaCrear(RecetaBase):
+    detalles: List[DetalleRecetaCrear]
+
+
+class DetalleReceta(DetalleRecetaBase):
+    id: int
+    receta_id: int
 
     class Config:
         from_attributes = True
 
 
+class Receta(RecetaBase):
+    id: int
+    estado: EstadoReceta
+    detalles: List[DetalleReceta] = []
 
-#ESQUEMA DE RESPUESTA PARA LA DISPENSACIÓN 
-# Esquema para funciOn de dispensar
+    class Config:
+        from_attributes = True
+        
+# TRANSACCIONES DE INVENTARIO
+
+class TransaccionBase(BaseModel):
+    tipo_transaccion: TipoTransaccion
+    medicamento_id: int
+    cantidad: int # POSITIVO ENTRADAS / NEGATIVO SALIDAS
+    motivo: Optional[str] = None
+
+class TransaccionCrear(TransaccionBase):
+    pass
+
+class TransaccionInventario(TransaccionBase):
+    id: int
+    fecha_hora: datetime
+    usuario_id: int
+    receta_id: Optional[int] = None
+
+    class Config:
+        from_attributes = True
+
+#RESPUESTAS DE LA DISPENSION
+
 class DispensarRespuesta(BaseModel):
-    receta: Receta  # SE USA EL ESKEMA DE RECETA
+    receta: Receta
     alertas: list[str]
+
+#PEDIDOS
+
+class DetallePedidoBase(BaseModel):
+    medicamento_id: int
+    cantidad: int
+
+class DetallePedidoCrear(DetallePedidoBase):
+    pass
+
+class DetallePedido(DetallePedidoBase):
+    id: int
+    pedido_id: int
+    class Config:
+        from_attributes = True
+
+class PedidoBase(BaseModel):
+    descripcion: str
+
+class PedidoCrear(PedidoBase):
+    detalles: List[DetallePedidoCrear]
+
+class Pedido(PedidoBase):
+    id: int
+    estado: str
+    fecha_creacion: datetime
+    detalles: List[DetallePedido] = []
+    
+    class Config:
+        from_attributes = True
