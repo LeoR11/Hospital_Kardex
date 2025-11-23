@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Panel de Funcionario - Farmacia Unidosis</title>
+    <link rel="stylesheet" href="estilos.css">
+</head>
+<body>
+    <div class="panel-container">
+        <nav class="panel-navegacion">
+            <button class="nav-button active" id="btn-panel-func">Panel Principal</button>
+            <button class="nav-button" id="btn-nueva-receta">Nueva Receta</button>
+            <button class="nav-button" id="btn-logout">Cerrar Sesion</button>
+        </nav>
+        <main class="panel-contenido" id="contenido-funcionario">
+            <h1>Panel Principal farmacia unidosis</h1>
+            
+            <div class="tarjetas-grid">
+                <div class="tarjeta" id="tarjeta-pendientes">
+                    <span class="tarjeta-numero" id="num-recetas-pendientes">...</span>
+                    <span class="tarjeta-label">Recetas Pendientes</span>
+                </div>
+                <div class="tarjeta" id="tarjeta-dispensadas">
+                    <span class="tarjeta-numero" id="num-recetas-dispensadas">...</span>
+                    <span class="tarjeta-label">Dispensadas (Hoy)</span>
+                </div>
+                <div class="tarjeta" id="tarjeta-stock-critico">
+                    <span class="tarjeta-numero" id="num-stock-critico">...</span>
+                    <span class="tarjeta-label">Medicamentos con Stock Crítico</span>
+                </div>
+                <div class="tarjeta" id="tarjeta-estado-kardex">
+                    <div class="kardex-status">
+                        <span>Kardex 1</span>
+                        <span class="status-dot" id="kardex-1-status"></span>
+                    </div>
+                    <div class="kardex-status">
+                        <span>Kardex 2</span>
+                        <span class="status-dot" id="kardex-2-status"></span>
+                    </div>
+                    <span class="tarjeta-label">Estado Operativo Kardex</span>
+                </div>
+            </div>
+        </main>
+    </div>
+    <script src="app.js"></script>
+</body>
+</html>

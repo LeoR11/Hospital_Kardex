@@ -99,7 +99,7 @@ class VentanaLogin(QWidget):
                 error = respuesta.json().get('detail', 'Credenciales incorrectas')
                 QMessageBox.critical(self, "Error de Autenticación", error)
         except requests.exceptions.RequestException as e:
-            QMessageBox.critical(self, "Error de Conexión", f"No se pudo conectar a la API: {e}")
+            QMessageBox.critical(self, "Error de Conexion", f"No se pudo conectar a la API: {e}")
     
     def accept(self):
         self.close()

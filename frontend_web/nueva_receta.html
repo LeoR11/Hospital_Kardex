@@ -2,24 +2,22 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Panel de Gestión - Sistema Kardex</title>
+    <title>Registrar Nueva Receta</title>
     <link rel="stylesheet" href="estilos.css">
 </head>
 <body>
     <div class="panel-container">
         <nav class="panel-navegacion">
-            <button class="nav-button" id="btn-panel">Panel Principal</button>
-            <button class="nav-button active" id="btn-recetas">Nueva Receta</button>
-            <button class="nav-button" id="btn-inventario">Inventario</button>
-            <button class="nav-button" id="btn-pedidos">Pedidos</button>
-            <button class="nav-button" id="btn-logout">Cerrar Sesión</button>
+            <button class="nav-button" id="btn-panel-func">Panel Principal</button>
+            <button class="nav-button active" id="btn-nueva-receta">Nueva Receta</button>
+            <button class="nav-button" id="btn-logout">Cerrar Sesion</button>
         </nav>
         <main class="panel-contenido" id="contenido-principal">
             <h1>Registrar Nueva Receta</h1>
             <form id="formulario-receta">
                 <div class="form-grid">
                     <div class="form-group">
-                        <label for="id_paciente">RUN del Paciente</label>
+                        <label for="id_paciente">RUT del Paciente</label>
                         <input type="text" id="id_paciente" required>
                     </div>
                     <div class="form-group">
@@ -27,17 +25,14 @@
                         <select id="profesional_id" required></select>
                     </div>
                     <div class="form-group">
-                        <label for="fecha_emision">Fecha de Emisión</label>
+                        <label for="fecha_emision">Fecha de Emision</label>
                         <input type="date" id="fecha_emision" required>
                     </div>
                 </div>
-
                 <hr>
-                <h3>Detalle de la Prescripción</h3>
-                
+                <h3>Detalle de la Prescripcion</h3>
                 <div id="contenedor-detalles">
                     </div>
-
                 <button type="button" id="btn-agregar-medicamento">Añadir Medicamento</button>
                 <hr>
                 <button type="submit" id="btn-registrar-receta">Registrar Receta Completa</button>

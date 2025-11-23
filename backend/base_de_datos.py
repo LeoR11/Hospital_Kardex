@@ -13,6 +13,6 @@ motor = create_engine(
 SesionLocal = sessionmaker(autocommit=False, autoflush=False, bind=motor)
 
 
-#    Crea la clase Base
+# Crea la clase Base
 # TOIDOS LOS MODELOS LA HEREDAN
 Base = declarative_base()

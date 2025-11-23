@@ -11,7 +11,7 @@ TIEMPO_EXPIRACION_TOKEN_MINUTOS = 30
 
 def verificar_clave(clave_plana: str, clave_hasheada: str) -> bool:
     """
-    Verifica si una contraseña en texto plano coincide con su versión hasheada.
+    Verifica si una contraseña en texto plano coincide con su version hasheada.
     """
     return bcrypt.checkpw(clave_plana.encode('utf-8'), clave_hasheada.encode('utf-8'))
 
