@@ -4,6 +4,18 @@
     <meta charset="UTF-8">
     <title>Registrar Nueva Receta</title>
     <link rel="stylesheet" href="estilos.css">
+    <style>
+        .input-group { display: flex; gap: 10px; }
+        .input-group input { flex-grow: 1; }
+        #btn-buscar-paciente {
+            padding: 10px 15px; background-color: #0d6efd; color: white;
+            border: none; border-radius: 4px; cursor: pointer;
+        }
+        #seccion-crear-paciente {
+            display: none; background-color: #fff3cd; padding: 15px;
+            border: 1px solid #ffeeba; border-radius: 5px; margin: 10px 0 20px 0;
+        }
+    </style>
 </head>
 <body>
     <div class="panel-container">
@@ -16,13 +28,38 @@
             <h1>Registrar Nueva Receta</h1>
             <form id="formulario-receta">
                 <div class="form-grid">
-                    <div class="form-group">
-                        <label for="id_paciente">RUT del Paciente</label>
-                        <input type="text" id="id_paciente" required>
+                    <div class="form-group" style="grid-column: span 2;">
+                        <label>Validacion de Paciente (Busqueda en HIS)</label>
+                        <div class="input-group">
+                            <input type="text" id="busqueda_rut" placeholder="Ingrese RUT (ej. 11111111-1)" required>
+                            <button type="button" id="btn-buscar-paciente">Buscar</button>
+                        </div>
+                        <input type="hidden" id="paciente_id_hidden">
+                        <input type="text" id="nombre_paciente_display" placeholder="Nombre del paciente..." disabled style="margin-top: 10px; background-color: #e9ecef; font-weight: bold;">
                     </div>
+
+                    <div id="seccion-crear-paciente" style="grid-column: span 2;">
+                        <h3>Paciente no encontrado</h3>
+                        <div class="form-grid">
+                            <input type="text" id="new_pac_nombre" placeholder="Nombre">
+                            <input type="text" id="new_pac_apellido" placeholder="Apellido">
+                            <input type="date" id="new_pac_nacimiento">
+                            <select id="new_pac_genero">
+                                <option value="M">Masculino</option>
+                                <option value="F">Femenino</option>
+                            </select>
+                            <select id="new_pac_prevision">
+                                <option value="FONASA A">FONASA A</option>
+                                <option value="FONASA B">FONASA B</option>
+                                <option value="ISAPRE">ISAPRE</option>
+                            </select>
+                        </div>
+                        <button type="button" id="btn-guardar-paciente" style="margin-top:10px; background-color: #198754; color: white; padding: 8px; border:none; border-radius:4px;">Registrar en HIS</button>
+                    </div>
+
                     <div class="form-group">
                         <label for="profesional_id">Profesional</label>
-                        <select id="profesional_id" required></select>
+                        <select id="profesional_id" required><option value="">Cargando...</option></select>
                     </div>
                     <div class="form-group">
                         <label for="fecha_emision">Fecha de Emision</label>
@@ -31,13 +68,12 @@
                 </div>
                 <hr>
                 <h3>Detalle de la Prescripcion</h3>
-                <div id="contenedor-detalles">
-                    </div>
-                <button type="button" id="btn-agregar-medicamento">Añadir Medicamento</button>
+                <div id="contenedor-detalles"></div>
+                <button type="button" id="btn-agregar-medicamento" style="margin-top: 10px;">Añadir Medicamento</button>
                 <hr>
-                <button type="submit" id="btn-registrar-receta">Registrar Receta Completa</button>
+                <button type="submit" id="btn-registrar-receta" style="width: 100%; margin-top: 20px; padding: 15px; background-color: #198754; color: white; border: none; font-size: 1.1em;">Registrar Receta Completa</button>
             </form>
-            <p id="mensaje"></p>
+            <p id="mensaje" style="margin-top: 15px; font-weight: bold;"></p>
         </main>
     </div>
     <script src="app.js"></script>

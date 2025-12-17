@@ -1,5 +1,5 @@
 import sys
-from PyQt6.QtWidgets import QApplication
+from PyQt6.QtWidgets import QApplication # type: ignore
 from login_desktop import VentanaLogin
 from main_window import VentanaPrincipal
 

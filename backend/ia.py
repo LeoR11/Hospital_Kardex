@@ -1,21 +1,24 @@
 import pandas as pd # type: ignore
 from sklearn.linear_model import LinearRegression # type: ignore
-from sklearn.model_selection import train_test_split # type: ignore
-import joblib
+import joblib # type: ignore
 import os
 from sqlalchemy.orm import Session # type: ignore
 from sqlalchemy import func # type: ignore
 import modelos
 from datetime import datetime
 
+# Directorio para guardar los modelos entrenados (.joblib)
 MODEL_DIR = "modelos_ia"
 os.makedirs(MODEL_DIR, exist_ok=True)
 
-#Primero obtiene los datos para el analisis
 def obtener_datos_historicos(db: Session, catalogo_id: int):
+    """
+    Obtiene el historial de dispensaciones para un producto del catálogo.f
+    Agrupa por fecha y suma las cantidades.
+    """
     query = (
         db.query(
-            modelos.TransaccionInventario.fecha_hora,
+            func.date(modelos.TransaccionInventario.fecha_hora).label("fecha"),
             func.sum(modelos.TransaccionInventario.cantidad).label("cantidad_total")
         )
         .join(modelos.Medicamento, modelos.TransaccionInventario.medicamento_id == modelos.Medicamento.id)
@@ -23,70 +26,94 @@ def obtener_datos_historicos(db: Session, catalogo_id: int):
             modelos.Medicamento.catalogo_id == catalogo_id,
             modelos.TransaccionInventario.tipo_transaccion == modelos.TipoTransaccion.dispensacion
         )
-        .group_by(modelos.TransaccionInventario.fecha_hora)
-        .order_by(modelos.TransaccionInventario.fecha_hora)
+        .group_by(func.date(modelos.TransaccionInventario.fecha_hora))
+        .order_by("fecha")
     )
     
-    df = pd.read_sql(query.statement, query.session.bind)
+    try:
+        df = pd.read_sql(query.statement, query.session.bind)
+    except Exception as e:
+        print(f"DEBUG IA: Error al leer SQL con Pandas: {e}")
+        return None
+
     if df.empty:
         return None
 
-    df['fecha_hora'] = pd.to_datetime(df['fecha_hora'])
-    df['cantidad'] = df['cantidad_total'].abs() 
-    df = df.set_index('fecha_hora')
+    # Preprocesamiento
+    df['fecha'] = pd.to_datetime(df['fecha'])
+    df['cantidad'] = df['cantidad_total'].abs() # Convertir negativos a positivos
     
-    df_diario = df.resample('D').sum()
-    df_diario = df_diario.fillna(0)
+    # Crear Features (X)
+    df['dia_del_anio'] = df['fecha'].dt.dayofyear
+    df['dia_de_la_semana'] = df['fecha'].dt.dayofweek
     
-    return df_diario
+    return df
 
-def entrenar_modelo_medicamento(catalogo_id: int, datos: pd.DataFrame):
+def entrenar_modelo_medicamento(db: Session, medicamento_fisico_id: int):
+    """
+    Entrena el modelo de regresión lineal para predecir demanda futura.
+    Recibe el ID físico, busca su catálogo y entrena.
+    """
+    # 1. Buscar a qué catálogo pertenece este medicamento físico
+    med_fisico = db.query(modelos.Medicamento).filter(modelos.Medicamento.id == medicamento_fisico_id).first()
+    if not med_fisico:
+        print(f"DEBUG IA: Medicamento fisico ID {medicamento_fisico_id} no encontrado.")
+        return False
+    
+    catalogo_id = med_fisico.catalogo_id
     model_path = os.path.join(MODEL_DIR, f"modelo_catalogo_{catalogo_id}.joblib")
+
+    # 2. Obtener datos históricos del catálogo completo
+    datos = obtener_datos_historicos(db, catalogo_id)
     
-    datos['dia_del_anio'] = datos.index.dayofyear
-    datos['dia_de_la_semana'] = datos.index.dayofweek
-    
+    if datos is None or len(datos) < 3:
+        # Se necesitan al menos 3 días de datos para una regresión mínimamente válida
+        print(f"DEBUG IA: Datos insuficientes para catálogo {catalogo_id}. No se entrena.")
+        return False
+
+    # 3. Preparar X e y
     X = datos[['dia_del_anio', 'dia_de_la_semana']]
     y = datos['cantidad']
 
-    if len(X) < 3: 
-        print(f"DEBUG IA: No hay suficientes datos (dias) para entrenar el modelo del catalogo {catalogo_id}. Se necesitan 3, se tienen {len(X)}")
+    try:
+        modelo = LinearRegression()
+        modelo.fit(X, y)
+        
+        # 4. Guardar modelo
+        joblib.dump(modelo, model_path)
+        print(f"DEBUG IA: Modelo actualizado para Catalogo ID {catalogo_id}")
+        return True
+    except Exception as e:
+        print(f"DEBUG IA: Error entrenando modelo: {e}")
         return False
 
-    modelo = LinearRegression()
-    modelo.fit(X, y)
-    
-    print(f"DEBUG IA: Modelo para catalogo {catalogo_id} entrenado.")
-    
-    joblib.dump(modelo, model_path)
-    return True
-
-
-def predecir_demanda_medicamento(catalogo_id: int, dias_a_predecir: int = 30):
+def predecir_demanda_medicamento(catalogo_id: int, dias_a_predecir: int = 7):
+    """
+    Carga el modelo guardado y predice la demanda para los próximos días.
+    """
     model_path = os.path.join(MODEL_DIR, f"modelo_catalogo_{catalogo_id}.joblib")
 
     if not os.path.exists(model_path):
         return None 
 
-    modelo = joblib.load(model_path)
-    
-    fecha_hoy = datetime.now()
-    fechas_futuras = pd.date_range(start=fecha_hoy, periods=dias_a_predecir)
-    
-    df_futuro = pd.DataFrame(index=fechas_futuras)
-    df_futuro['dia_del_anio'] = df_futuro.index.dayofyear
-    df_futuro['dia_de_la_semana'] = df_futuro.index.dayofweek
-    
-    X_futuro = df_futuro[['dia_del_anio', 'dia_de_la_semana']]
-    
-    predicciones = modelo.predict(X_futuro)
-    predicciones[predicciones < 0] = 0
-    prediccion_dia_1 = predicciones[0] if len(predicciones) > 0 else 0
-    demanda_total = sum(predicciones)
-    
-    return {
-        "catalogo_id": catalogo_id,
-        "dias_predichos": dias_a_predecir,
-        "prediccion_dia_1": round(prediccion_dia_1, 2),
-        "demanda_total_estimada": round(demanda_total, 2)
-    }
+    try:
+        modelo = joblib.load(model_path)
+        
+        fecha_hoy = datetime.now()
+        fechas_futuras = pd.date_range(start=fecha_hoy, periods=dias_a_predecir)
+        
+        df_futuro = pd.DataFrame(index=fechas_futuras)
+        df_futuro['dia_del_anio'] = df_futuro.index.dayofyear
+        df_futuro['dia_de_la_semana'] = df_futuro.index.dayofweek
+        
+        X_futuro = df_futuro[['dia_del_anio', 'dia_de_la_semana']]
+        
+        predicciones = modelo.predict(X_futuro)
+        
+        # Evitar predicciones negativas
+        df_futuro['demanda_predicha'] = [max(0, p) for p in predicciones]
+        
+        return df_futuro
+    except Exception as e:
+        print(f"DEBUG IA: Error en predicción: {e}")
+        return None

@@ -1,0 +1,23 @@
+# --- Backend Framework & API ---
+fastapi
+uvicorn[standard]
+python-multipart
+
+# --- Base de Datos & ORM ---
+sqlalchemy
+pymongo
+
+# --- Seguridad & Autenticación ---
+python-jose[cryptography]
+passlib[bcrypt]
+bcrypt
+
+# --- Inteligencia Artificial & Datos ---
+pandas
+scikit-learn
+joblib
+numpy
+
+# --- Frontend Desktop & Utilidades ---
+PyQt6
+requests

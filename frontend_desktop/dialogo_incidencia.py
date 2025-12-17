@@ -1,13 +1,8 @@
-import requests
-from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel, 
-                             QComboBox, QTextEdit, QPushButton, QMessageBox, 
-                             QFormLayout)
-from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QLabel, QComboBox,  # type: ignore
+                             QTextEdit, QPushButton, QMessageBox, QFormLayout, 
+                             QHBoxLayout)
 
 class DialogoIncidencia(QDialog):
-    """
-    Diálogo para que el operario reporte una falla en un Kardex (K1 o K2).
-    """
     def __init__(self, lista_kardex, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Reportar Falla de Kardex")
@@ -26,14 +21,14 @@ class DialogoIncidencia(QDialog):
         
         self.reporte_texto = QTextEdit()
         self.reporte_texto.setMinimumHeight(100)
-        self.reporte_texto.setPlaceholderText("Ej. El cajon A05 está atascado")
+        self.reporte_texto.setPlaceholderText("Ej. El cajon A05 esta atascado")
 
         form_layout.addRow("Kardex Afectado:", self.kardex_combo)
         form_layout.addRow("Descripcion de la Falla:", self.reporte_texto)
+        
         layout.addLayout(form_layout)
 
         botones_layout = QHBoxLayout()
-        botones_layout.addStretch()
         btn_cancelar = QPushButton("Cancelar")
         btn_cancelar.clicked.connect(self.reject)
         
@@ -68,10 +63,6 @@ class DialogoIncidencia(QDialog):
         self.accept()
 
     def obtener_datos(self):
-        """
-        Devuelve un diccionario listo para enviar como JSON al endpoint
-        POST /kardex/reportar-falla/
-        """
         return {
             "kardex_id": self.kardex_combo.currentData(),
             "reporte_operario": self.reporte_texto.toPlainText().strip()

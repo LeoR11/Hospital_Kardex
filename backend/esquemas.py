@@ -1,6 +1,6 @@
-from pydantic import BaseModel
+from pydantic import BaseModel # type: ignore
 from datetime import date, datetime
-from typing import List, Optional
+from typing import List, Optional, Dict
 from modelos import (RolUsuario, EstadoReceta, TipoTransaccion, 
                      EstadoKardex, EstadoIncidencia)
 
@@ -41,7 +41,7 @@ class Profesional(ProfesionalBase):
     class Config:
         from_attributes = True
         
-# --- Esquemas de MedicamentoCatalogo ---
+# --- Esquemas de Catalogo ---
 class MedicamentoCatalogoBase(BaseModel):
     nombre: str
     descripcion: Optional[str] = None
@@ -51,30 +51,55 @@ class MedicamentoCatalogoCrear(MedicamentoCatalogoBase):
 
 class MedicamentoCatalogo(MedicamentoCatalogoBase):
     id: int
+    stock_total: Optional[int] = 0
+    demanda_estimada_30_dias: Optional[float] = None
+    estado_ia: Optional[str] = "SIN_DATOS"
     
     class Config:
         from_attributes = True
 
-# --- Esquemas de Medicamento (Ubicacion) ---
+# --- Esquemas de Inventario Fisico ---
 class MedicamentoBase(BaseModel):
+    catalogo_id: int
     ubicacion: str
     lote: str
     fecha_vencimiento: date
     stock_actual: int
     umbral_minimo: int
 
-class MedicamentoCrear(MedicamentoBase):
-    catalogo_id: int
-
 class Medicamento(MedicamentoBase):
     id: int
-    catalogo_id: int
-    catalogo: MedicamentoCatalogo 
+    catalogo: Optional[MedicamentoCatalogo] = None
 
     class Config:
         from_attributes = True
 
-# --- Esquemas de Receta ---
+class TransaccionManual(BaseModel):
+    tipo_transaccion: TipoTransaccion
+    medicamento_id: int
+    cantidad: int # Positivo o negativo manejado en frontend/backend
+    motivo: str
+
+# --- Esquemas de Paciente (HIS) ---
+class PacienteBase(BaseModel):
+    run: str
+    nombre: str
+    apellido: str
+    fecha_nacimiento: date
+    genero: str
+    prevision: str
+    alergias: Optional[str] = None
+
+class PacienteCrear(PacienteBase):
+    pass
+
+class Paciente(PacienteBase):
+    id: int
+    
+    class Config:
+        from_attributes = True
+
+# --- Esquemas de Recetas ---
 class DetalleRecetaBase(BaseModel):
     catalogo_id: int
     cantidad: int
@@ -84,166 +109,107 @@ class DetalleRecetaCrear(DetalleRecetaBase):
 
 class DetalleReceta(DetalleRecetaBase):
     id: int
-    receta_id: int
     catalogo: MedicamentoCatalogo
 
     class Config:
         from_attributes = True
 
-class RecetaBase(BaseModel):
-    id_paciente: str
-    fecha_emision: date
+class RecetaCrear(BaseModel):
+    paciente_id: int
     profesional_id: int
-
-class RecetaCrear(RecetaBase):
+    fecha_emision: date
     detalles: List[DetalleRecetaCrear]
 
-class ProfesionalSimple(BaseModel): 
-    nombre: str
-    class Config:
-        from_attributes = True
-
-class Receta(RecetaBase):
+class Receta(BaseModel):
     id: int
+    paciente: Optional[Paciente]
+    profesional: Optional[Profesional]
+    fecha_emision: date
     estado: EstadoReceta
-    detalles: List[DetalleReceta] = []
-    profesional: Optional[ProfesionalSimple] = None 
+    detalles: List[DetalleReceta]
 
     class Config:
         from_attributes = True
 
-# --- Esquemas de Transaccion ---
-class TransaccionBase(BaseModel):
-    tipo_transaccion: TipoTransaccion
-    medicamento_id: int 
-    cantidad: int
-    motivo: Optional[str] = None
+# --- NUEVO: Esquema de Respuesta para Dispensacion ---
+class RespuestaDispensacion(BaseModel):
+    mensaje: str
+    medicamentos_afectados: List[int]
+    alertas: List[str]
 
-class TransaccionCrear(TransaccionBase):
-    pass
-
-class TransaccionInventario(TransaccionBase):
-    id: int
-    fecha_hora: datetime
-    usuario_id: int
-    receta_id: Optional[int] = None
-
-    class Config:
-        from_attributes = True
-
-class DispensarRespuesta(BaseModel):
-    receta: Receta
-    alertas: list[str]
-
-# --- Esquemas de Pedido ---
-class PedidoBase(BaseModel):
-    descripcion: str
-
+# --- Esquemas de Pedidos ---
 class DetallePedidoBase(BaseModel):
-    catalogo_id: int 
+    catalogo_id: int
     cantidad: int
-
-class DetallePedidoCrear(DetallePedidoBase):
-    pass
 
 class DetallePedido(DetallePedidoBase):
     id: int
-    pedido_id: int
     catalogo: MedicamentoCatalogo
-
+    
     class Config:
         from_attributes = True
 
-class PedidoCrear(PedidoBase):
-    detalles: List[DetallePedidoCrear]
+class PedidoCrear(BaseModel):
+    descripcion: str
+    detalles: List[DetallePedidoBase]
 
-class Pedido(PedidoBase):
+class Pedido(BaseModel):
     id: int
-    estado: str
     fecha_creacion: datetime
-    detalles: List[DetallePedido] = []
+    descripcion: str
+    estado: str
+    detalles: List[DetallePedido]
     
     class Config:
         from_attributes = True
 
-# --- Esquemas para Recepcion de Pedidos ---
-class RecepcionItem(BaseModel):
+# Estructuras para la recepción compleja de pedidos
+class ItemRecepcionNuevaUbicacion(BaseModel):
+    catalogo_id: int
+    ubicacion: str
+    lote: str
+    fecha_vencimiento: date
+    stock_actual: int
+    umbral_minimo: int
+
+class ItemRecepcion(BaseModel):
     detalle_pedido_id: int
-    accion: str 
-    medicamento_id_ubicacion: Optional[int] = None 
-    nueva_ubicacion_data: Optional[MedicamentoCrear] = None
+    accion: str # 'existing' o 'new'
+    medicamento_id_ubicacion: Optional[int] = None # Si es existing
+    nueva_ubicacion_data: Optional[ItemRecepcionNuevaUbicacion] = None # Si es new
 
-class RecepcionPedidoPayload(BaseModel):
-    items: List[RecepcionItem]
+class RecepcionPedido(BaseModel):
+    items: List[ItemRecepcion]
 
-# --- Esquema para el asistente de reposicion (ia) --- 
-#revisar archivo ia.py
-class SugerenciaPedido(BaseModel):
-    catalogo_id: int
-    nombre_medicamento: str
-    stock_actual: int
-    demanda_estimada_30_dias: float
-    cantidad_sugerida_a_pedir: float
-    
-    class Config:
-        from_attributes = True
-
-# --- Esquema para dashboard de catalogo---
-#ia.py
-class CatalogoDashboardItem(MedicamentoCatalogo):
-    stock_total: int
-    demanda_estimada_30_dias: Optional[float] = None
-    estado_ia: str
-    
-    class Config:
-        from_attributes = True
-
-# --- Esquema para el asistenmte de preparacion---
-#ia.py
-class PrediccionDiariaItem(BaseModel):
-    catalogo_id: int
-    nombre_medicamento: str
-    stock_actual: int
-    demanda_estimada_hoy: float
-    
-    class Config:
-        from_attributes = True
-
-# --- esquemas para la gestion de los kardex ---
-class KardexBase(BaseModel):
+# --- Esquemas de Kardex / Incidencias ---
+class Kardex(BaseModel):
+    id: int
     nombre: str
     identificador: str
-
-class Kardex(KardexBase):
-    id: int
     estado: EstadoKardex
 
     class Config:
         from_attributes = True
 
-class IncidenciaKardexBase(BaseModel):
-    reporte_operario: str
-
-class IncidenciaKardexCrear(IncidenciaKardexBase):
+class IncidenciaKardexCrear(BaseModel):
     kardex_id: int 
+    reporte_operario: str
 
 class IncidenciaKardexResolver(BaseModel):
     respuesta_admin: str
     fecha_resolucion_programada: Optional[datetime] = None
     estado_incidencia: EstadoIncidencia
     
-class IncidenciaKardex(IncidenciaKardexBase):
+class IncidenciaKardex(BaseModel):
     id: int
     kardex_id: int
     fecha_reporte: datetime
+    reporte_operario: str
     estado_incidencia: EstadoIncidencia
-    fecha_resolucion_programada: Optional[datetime] = None
-    respuesta_admin: Optional[str] = None
-    
-    # se usa el esquema del usuario que hace la operacion para reportar o resolver
-    usuario_reporta: Usuario 
-    usuario_resuelve: Optional[Usuario] = None
+    respuesta_admin: Optional[str]
     kardex: Kardex
-
+    kardex: Kardex
+    usuario_reporta: Optional[Usuario] = None
+    
     class Config:
         from_attributes = True

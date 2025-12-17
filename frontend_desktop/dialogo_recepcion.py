@@ -1,17 +1,11 @@
-import requests
-from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel, 
+import requests # type: ignore
+from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,  # type: ignore
                              QPushButton, QMessageBox, QFormLayout, QComboBox,
                              QScrollArea, QWidget, QRadioButton, QLineEdit,
-                             QDateEdit, QStackedWidget, QSizePolicy)
-from PyQt6.QtCore import Qt, QDate
-from datetime import date
-
+                             QDateEdit, QButtonGroup, QSpinBox)
+from PyQt6.QtCore import Qt, QDate # type: ignore
 
 class _ItemRecepcionWidget(QWidget):
-    """
-    Un widget que maneja la logica para 1 solo item del pedido.
-    (ej. 100 unidades de "Paracetamol 500mg")
-    """
     def __init__(self, detalle_pedido, ubicaciones_compatibles):
         super().__init__()
         self.detalle_pedido = detalle_pedido 
@@ -22,229 +16,173 @@ class _ItemRecepcionWidget(QWidget):
         self.catalogo_id = self.detalle_pedido['catalogo_id'] 
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setContentsMargins(5, 5, 5, 5)
 
-        label_titulo = QLabel(f"<b>{self.catalogo_nombre}</b> (Cantidad a recibir: {self.cantidad_recibida})")
-        label_titulo.setStyleSheet("font-size: 16px; padding: 5px; background-color: #f0f0f0; border-radius: 4px; color: #212529;")
+        label_titulo = QLabel(f"{self.catalogo_nombre} (Cantidad: {self.cantidad_recibida})")
+        label_titulo.setStyleSheet("font-weight: bold; padding: 5px; background-color: #e9ecef;")
         layout.addWidget(label_titulo)
 
-        self.radio_existente = QRadioButton("1. Sumar a ubicacion existente")
-        self.radio_nuevo = QRadioButton("2. Crear nueva ubicacion")
-        layout_radios = QHBoxLayout()
-        layout_radios.addWidget(self.radio_existente)
-        layout_radios.addWidget(self.radio_nuevo)
-        layout.addLayout(layout_radios)
+        self.grupo_radios = QButtonGroup(self)
+        
+        self.radio_existente = QRadioButton("Sumar a ubicacion existente")
+        self.radio_nueva = QRadioButton("Crear nueva ubicacion")
+        
+        self.grupo_radios.addButton(self.radio_existente)
+        self.grupo_radios.addButton(self.radio_nueva)
+        
+        layout.addWidget(self.radio_existente)
+        layout.addWidget(self.radio_nueva)
 
-
-        self.stack = QStackedWidget()
         self.widget_existente = QWidget()
-        self.widget_nuevo = QWidget()
+        layout_existente = QVBoxLayout(self.widget_existente)
+        layout_existente.setContentsMargins(20, 0, 0, 0)
+        self.combo_ubicaciones = QComboBox()
+        self.combo_ubicaciones.addItem("Seleccione ubicacion...", -1)
+        for u in self.ubicaciones_compatibles:
+            texto = f"Ubic: {u['ubicacion']} | Lote: {u['lote']} | Vence: {u['fecha_vencimiento']}"
+            self.combo_ubicaciones.addItem(texto, u['id'])
+        layout_existente.addWidget(self.combo_ubicaciones)
         
-        self.stack.addWidget(self.widget_existente)
-        self.stack.addWidget(self.widget_nuevo)
-        layout.addWidget(self.stack)
-
-  
-        layout_existente = QFormLayout(self.widget_existente)
-        self.combo_ubicaciones_existentes = QComboBox()
-        self.combo_ubicaciones_existentes.setMinimumHeight(30)
-        self.combo_ubicaciones_existentes.addItem("Seleccione ubicacion...", -1)
-        if not self.ubicaciones_compatibles:
-            self.radio_existente.setDisabled(True)
-            self.radio_existente.setText("1. (No hay ubicaciones existentes para este item)")
-        else:
-            for ubic in self.ubicaciones_compatibles:
-                ubic_str = ubic['ubicacion']
-                kardex_id = self._obtener_kardex_id(ubic_str)
-                texto = f"{kardex_id} / {ubic_str} (Stock actual: {ubic['stock_actual']})"
-                
-                self.combo_ubicaciones_existentes.addItem(texto, ubic['id'])
-        layout_existente.addRow("Ubicacion de destino:", self.combo_ubicaciones_existentes)
+        self.widget_nueva = QWidget()
+        layout_nueva = QFormLayout(self.widget_nueva)
+        layout_nueva.setContentsMargins(20, 0, 0, 0)
         
-        layout_nuevo = QFormLayout(self.widget_nuevo)
-        self.line_ubicacion = QLineEdit()
-        self.line_ubicacion.setMinimumHeight(30)
-        self.line_ubicacion.setPlaceholderText("Ej. A06, K15")
-        self.line_lote = QLineEdit()
-        self.line_lote.setMinimumHeight(30)
-        self.line_vencimiento = QDateEdit()
-        self.line_vencimiento.setMinimumHeight(30)
-        self.line_vencimiento.setCalendarPopup(True)
-        self.line_vencimiento.setDate(QDate.currentDate().addYears(1))
-        self.line_vencimiento.setMinimumDate(QDate.currentDate())
-        self.line_umbral = QLineEdit("10")
-        self.line_umbral.setMinimumHeight(30)
+        self.input_ubicacion = QLineEdit()
+        self.input_lote = QLineEdit()
+        self.input_vencimiento = QDateEdit()
+        self.input_vencimiento.setDate(QDate.currentDate().addYears(1))
+        self.input_vencimiento.setCalendarPopup(True)
+        self.input_umbral = QSpinBox()
+        self.input_umbral.setRange(0, 1000)
+        self.input_umbral.setValue(10)
 
-        layout_nuevo.addRow("Nueva Ubicacion (A01-R99):", self.line_ubicacion)
-        layout_nuevo.addRow("Lote:", self.line_lote)
-        layout_nuevo.addRow("Fecha Vencimiento:", self.line_vencimiento)
-        layout_nuevo.addRow("Umbral Minimo:", self.line_umbral)
+        layout_nueva.addRow("Ubicacion (Coord):", self.input_ubicacion)
+        layout_nueva.addRow("Lote:", self.input_lote)
+        layout_nueva.addRow("Vencimiento:", self.input_vencimiento)
+        layout_nueva.addRow("Stock Minimo:", self.input_umbral)
 
-        self.radio_existente.toggled.connect(self.actualizar_interfaz)
+        layout.addWidget(self.widget_existente)
+        layout.addWidget(self.widget_nueva)
+
+        self.radio_existente.toggled.connect(self.actualizar_visibilidad)
+        self.radio_nueva.toggled.connect(self.actualizar_visibilidad)
         
         if self.ubicaciones_compatibles:
             self.radio_existente.setChecked(True)
         else:
-            self.radio_nuevo.setChecked(True)
-        self.actualizar_interfaz()
+            self.radio_existente.setDisabled(True)
+            self.radio_nueva.setChecked(True)
+            
+        self.actualizar_visibilidad()
+        
+        self.setStyleSheet("border: 1px solid #ced4da; border-radius: 4px; margin-bottom: 5px;")
+        self.widget_existente.setStyleSheet("border: none;")
+        self.widget_nueva.setStyleSheet("border: none;")
 
-    def _obtener_kardex_id(self, ubicacion_str):
-        """Funcion helper para identificar el Kardex basado en la regla del negocio."""
-        if not ubicacion_str: return "?"
-        letra = ubicacion_str[0].upper()
-        if 'A' <= letra <= 'I': return "K1"
-        if 'J' <= letra <= 'R': return "K2"
-        return "K?"
-
-    def actualizar_interfaz(self):
-        if self.radio_existente.isChecked():
-            self.stack.setCurrentIndex(0) 
-        else:
-            self.stack.setCurrentIndex(1) 
+    def actualizar_visibilidad(self):
+        self.widget_existente.setVisible(self.radio_existente.isChecked())
+        self.widget_nueva.setVisible(self.radio_nueva.isChecked())
 
     def obtener_item_payload(self):
-        """
-        Valida los datos de este widget y devuelve el diccionario 
-        para el payload final (esquemas.RecepcionItem).
-        """
-        detalle_pedido_id = self.detalle_pedido['id']
-
         if self.radio_existente.isChecked():
-            medicamento_id_ubicacion = self.combo_ubicaciones_existentes.currentData()
-            if medicamento_id_ubicacion == -1:
-                QMessageBox.warning(self, "Error de Validacion",
-                    f"Para '{self.catalogo_nombre}', debe seleccionar una ubicacion existente.")
+            ubic_id = self.combo_ubicaciones.currentData()
+            if ubic_id == -1:
                 return None
-            
             return {
-                "detalle_pedido_id": detalle_pedido_id,
+                "detalle_pedido_id": self.detalle_pedido['id'],
                 "accion": "existing",
-                "medicamento_id_ubicacion": medicamento_id_ubicacion,
+                "medicamento_id_ubicacion": ubic_id,
                 "nueva_ubicacion_data": None
             }
-
-        elif self.radio_nuevo.isChecked():
-            ubicacion = self.line_ubicacion.text().strip().upper()
-            lote = self.line_lote.text().strip()
-            fecha_vencimiento_str = self.line_vencimiento.date().toString("yyyy-MM-dd")
-            umbral_str = self.line_umbral.text().strip()
-
-            if not ubicacion or not lote or not umbral_str:
-                QMessageBox.warning(self, "Error de Validacion",
-                    f"Para '{self.catalogo_nombre}', debe completar todos los campos de la nueva ubicacion.")
+        else:
+            ubic = self.input_ubicacion.text().strip()
+            lote = self.input_lote.text().strip()
+            if not ubic or not lote:
                 return None
-
-            if not (len(ubicacion) > 1 and 'A' <= ubicacion[0] <= 'R' and ubicacion[1:].isdigit() and len(ubicacion) <= 5):
-                QMessageBox.warning(self, "Error de Formato",
-                    f"Para '{self.catalogo_nombre}', la ubicación '{ubicacion}' es invalida. "
-                    "Debe ser una letra (A-R) seguida de numeros (ej. A01, C23, K10).")
-                return None
-
-            try:
-                umbral = int(umbral_str)
-            except ValueError:
-                QMessageBox.warning(self, "Error de Validacion",
-                    f"Para '{self.catalogo_nombre}', el umbral minimo debe ser un numero.")
-                return None
-
+            
+            fecha_venc = self.input_vencimiento.date().toString("yyyy-MM-dd")
+            
             return {
-                "detalle_pedido_id": detalle_pedido_id,
+                "detalle_pedido_id": self.detalle_pedido['id'],
                 "accion": "new",
                 "medicamento_id_ubicacion": None,
                 "nueva_ubicacion_data": {
                     "catalogo_id": self.catalogo_id, 
-                    "ubicacion": ubicacion,
+                    "ubicacion": ubic,
                     "lote": lote,
-                    "fecha_vencimiento": fecha_vencimiento_str,
-                    "stock_actual": self.cantidad_recibida, 
-                    "umbral_minimo": umbral
+                    "fecha_vencimiento": fecha_venc,
+                    "stock_actual": 0, 
+                    "umbral_minimo": self.input_umbral.value()
                 }
             }
-        return None
 
 class DialogoRecepcion(QDialog):
-    def __init__(self, token, api_url, pedido_obj, todas_las_ubicaciones, parent=None):
+    def __init__(self, token, api_url, pedido, todas_las_ubicaciones, parent=None):
         super().__init__(parent)
         self.token = token
         self.api_url = api_url
-        self.pedido = pedido_obj
+        self.pedido = pedido
         self.todas_las_ubicaciones = todas_las_ubicaciones
-        self.item_widgets = []
         self.payload_final = None
 
         self.setWindowTitle(f"Recepcionar Pedido #{self.pedido['id']}")
-        self.setMinimumSize(700, 500)
-        
+        self.setMinimumWidth(550)
+        self.resize(550, 600)
+
         layout = QVBoxLayout(self)
+        layout.addWidget(QLabel("Configure el destino de cada item recibido:"))
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        contenedor = QWidget()
+        self.layout_items = QVBoxLayout(contenedor)
         
-        label_titulo = QLabel(f"<b>Pedido:</b> {self.pedido['descripcion']}")
-        label_titulo.setStyleSheet("font-size: 18px; color: #212529;")
-        layout.addWidget(label_titulo)
-        layout.addWidget(QLabel("Asigne una ubicacion de destino para cada item del pedido:"))
+        self.widgets_items = []
+        for detalle in self.pedido['detalles']:
+            cat_id = detalle['catalogo']['id']
+            compatibles = [u for u in self.todas_las_ubicaciones if u['catalogo_id'] == cat_id]
+            
+            widget = _ItemRecepcionWidget(detalle, compatibles)
+            self.layout_items.addWidget(widget)
+            self.widgets_items.append(widget)
 
+        scroll.setWidget(contenedor)
+        layout.addWidget(scroll)
 
-        scroll_area = QScrollArea()
-        scroll_area.setWidgetResizable(True)
-        scroll_content = QWidget()
-        layout_scroll = QVBoxLayout(scroll_content)
-        layout_scroll.setAlignment(Qt.AlignmentFlag.AlignTop)
-        scroll_area.setWidget(scroll_content)
-        
-        layout.addWidget(scroll_area)
-   
-        detalles_pedido = self.pedido.get('detalles', [])
-        if not detalles_pedido:
-             layout_scroll.addWidget(QLabel("Este pedido no tiene items."))
-        else:
-            for detalle in detalles_pedido:
-                if not detalle.get('catalogo'): continue 
-                
-                catalogo_id = detalle['catalogo_id']
-                
-                ubicaciones_compatibles = [
-                    ubic for ubic in self.todas_las_ubicaciones
-                    if ubic['catalogo_id'] == catalogo_id
-                ]
-                
-                item_widget = _ItemRecepcionWidget(detalle, ubicaciones_compatibles)
-                layout_scroll.addWidget(item_widget)
-                self.item_widgets.append(item_widget) 
-
-        botones_layout = QHBoxLayout()
-        botones_layout.addStretch()
+        botones = QHBoxLayout()
         btn_cancelar = QPushButton("Cancelar")
         btn_cancelar.clicked.connect(self.reject)
-        self.btn_confirmar = QPushButton("Confirmar Recepcion")
-        self.btn_confirmar.setDefault(True)
-        self.btn_confirmar.clicked.connect(self.validar_y_aceptar)
-        botones_layout.addWidget(btn_cancelar)
-        botones_layout.addWidget(self.btn_confirmar)
-        layout.addLayout(botones_layout)
         
-        if not detalles_pedido:
-            self.btn_confirmar.setDisabled(True)
+        btn_confirmar = QPushButton("Confirmar Recepcion")
+        btn_confirmar.setDefault(True)
+        btn_confirmar.setStyleSheet("background-color: #0d6efd; color: white; font-weight: bold;")
+        btn_confirmar.clicked.connect(self.validar_y_aceptar)
+        
+        botones.addWidget(btn_cancelar)
+        botones.addWidget(btn_confirmar)
+        layout.addLayout(botones)
 
     def validar_y_aceptar(self):
         items_payload = []
-        
-        for widget in self.item_widgets:
-            payload_item = widget.obtener_item_payload()
-            
-            if payload_item is None:
-                return 
-            
-            items_payload.append(payload_item)
+        ubicaciones_nuevas_temp = set()
 
-        ubicaciones_nuevas = set()
-        for item in items_payload:
-            if item['accion'] == 'new':
-                ubic_str = item['nueva_ubicacion_data']['ubicacion']
-                if ubic_str in ubicaciones_nuevas:
-                    QMessageBox.warning(self, "Error de Duplicado",
-                        f"La ubicacion '{ubic_str}' se ha asignado mas de una vez en este mismo pedido.\n"
-                        "Por favor, asigne cada nuevo item a una ubicación unica.")
+        for w in self.widgets_items:
+            data = w.obtener_item_payload()
+            if data is None:
+                QMessageBox.warning(self, "Datos Incompletos", 
+                                    f"Falta informacion para el item '{w.catalogo_nombre}'.\n"
+                                    "Seleccione una ubicacion existente o complete los datos de la nueva.")
+                return
+            
+            if data['accion'] == 'new':
+                nueva_ubic = data['nueva_ubicacion_data']['ubicacion']
+                if nueva_ubic in ubicaciones_nuevas_temp:
+                    QMessageBox.warning(self, "Ubicacion Duplicada", 
+                                        f"Esta intentando crear la ubicacion '{nueva_ubic}' dos veces en este pedido.")
                     return
-                ubicaciones_nuevas.add(ubic_str)
+                ubicaciones_nuevas_temp.add(nueva_ubic)
+                
+            items_payload.append(data)
 
         self.payload_final = {"items": items_payload}
         self.accept()

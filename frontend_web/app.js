@@ -21,7 +21,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 if (!respuesta.ok) {
                     const error = await respuesta.json();
-                    throw new Error(error.detail || 'Usuario o contraseña incorrectos.');
+                    throw new Error(error.detail || 'Usuario o contrasena incorrectos.');
                 }
                 
                 const data = await respuesta.json();
@@ -43,7 +43,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // --- LOGICA PANEL FUNCIONARIO ---
+    // --- LOGICA DEL PANEL DE FUNCIONARIO ---
     const panelFuncionario = document.getElementById('contenido-funcionario');
     if (panelFuncionario) {
         if (!token || rol !== "funcionario") {
@@ -69,7 +69,6 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 const headers = { 'Authorization': `Bearer ${token}` };
                 
-                // Cargar Recetas
                 const respuestaRecetas = await fetch(`${urlBaseApi}/recetas/`, { headers });
                 if (!respuestaRecetas.ok) throw new Error('No se pudieron cargar las recetas.');
                 const recetas = await respuestaRecetas.json();
@@ -78,7 +77,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 labelNumPendientes.textContent = pendientes.length;
                 labelNumDispensadas.textContent = dispensadas.length;
 
-                // Cargar Stock Critico
                 const respuestaMeds = await fetch(`${urlBaseApi}/medicamentos/`, { headers });
                 if (!respuestaMeds.ok) throw new Error('No se pudo cargar el inventario.');
                 const medicamentos = await respuestaMeds.json(); 
@@ -95,12 +93,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
                 const numCriticos = Object.values(medsAgrupados).filter(m => m.esCritico).length;
                 labelNumStockCritico.textContent = numCriticos;
-                // Llama al endpoint que lee la BD que devuelve una lista
+                
                 const respuestaKardex = await fetch(`${urlBaseApi}/kardex/status/`, { headers });
                 if (!respuestaKardex.ok) throw new Error('No se pudo cargar el estado del Kardex.');
                 const estadoKardexLista = await respuestaKardex.json();
                 
-                //busca en la lista
                 const getEstado = (id) => estadoKardexLista.find(k => k.identificador === id)?.estado || 'en_falla';
 
                 const estadoK1 = getEstado("K1");
@@ -124,8 +121,7 @@ document.addEventListener('DOMContentLoaded', () => {
         cargarEstadisticas();
     }
 
-
-    // --- LOGICA CREAR RECETA ---
+    // --- LOGICA DE NUEVA RECETA (FUNCIONARIO) ---
     const formularioReceta = document.getElementById('formulario-receta');
     if (formularioReceta) {
         if (!token || rol !== "funcionario") {
@@ -133,19 +129,90 @@ document.addEventListener('DOMContentLoaded', () => {
             window.location.href = 'index.html';
             return;
         }
-        document.getElementById('btn-panel-func').addEventListener('click', () => window.location.href = 'panel_funcionario.html');
-        document.getElementById('btn-nueva-receta').addEventListener('click', () => {});
-        document.getElementById('btn-logout').addEventListener('click', () => {
-            localStorage.clear();
-            window.location.href = 'index.html';
-        });
+        
+        const inputRutBusqueda = document.getElementById('busqueda_rut');
+        const btnBuscarPaciente = document.getElementById('btn-buscar-paciente');
+        const inputNombreDisplay = document.getElementById('nombre_paciente_display');
+        const inputPacienteIdHidden = document.getElementById('paciente_id_hidden');
+        const seccionCrearPaciente = document.getElementById('seccion-crear-paciente');
+        const btnGuardarPaciente = document.getElementById('btn-guardar-paciente');
 
         const selectProfesional = document.getElementById('profesional_id');
         const inputFecha = document.getElementById('fecha_emision');
         const contenedorDetalles = document.getElementById('contenedor-detalles');
         const btnAgregar = document.getElementById('btn-agregar-medicamento');
         const mensaje = document.getElementById('mensaje');
-        
+        const btnLogout = document.getElementById('btn-logout');
+
+
+        document.getElementById('btn-panel-func').addEventListener('click', () => window.location.href = 'panel_funcionario.html');
+        btnLogout.addEventListener('click', () => { localStorage.clear(); window.location.href = 'index.html'; });
+
+        btnBuscarPaciente.addEventListener('click', async () => {
+            const rut = inputRutBusqueda.value.trim();
+            if (!rut) { alert("Ingrese un RUT"); return; }
+            
+            mensaje.textContent = "Buscando en HIS...";
+            mensaje.style.color = "blue";
+            seccionCrearPaciente.style.display = 'none'; 
+
+            try {
+                const headers = { 'Authorization': `Bearer ${token}` };
+                const resp = await fetch(`${urlBaseApi}/his/pacientes/buscar/${rut}`, { headers });
+                
+                if (resp.ok) {
+                    const paciente = await resp.json();
+                    inputNombreDisplay.value = `${paciente.nombre} ${paciente.apellido} (${paciente.prevision})`;
+                    inputPacienteIdHidden.value = paciente.id; 
+                    mensaje.textContent = "Paciente validado correctamente.";
+                    mensaje.style.color = "green";
+                    inputRutBusqueda.readOnly = true; 
+                } else {
+                    inputNombreDisplay.value = "";
+                    inputPacienteIdHidden.value = "";
+                    mensaje.textContent = "Paciente no encontrado. Debe registrarlo.";
+                    mensaje.style.color = "#d63384"; 
+                    seccionCrearPaciente.style.display = 'block'; 
+                }
+            } catch (error) {
+                mensaje.textContent = "Error de conexion con HIS.";
+            }
+        });
+
+        btnGuardarPaciente.addEventListener('click', async () => {
+            const payloadPaciente = {
+                run: inputRutBusqueda.value.trim(),
+                nombre: document.getElementById('new_pac_nombre').value,
+                apellido: document.getElementById('new_pac_apellido').value,
+                fecha_nacimiento: document.getElementById('new_pac_nacimiento').value,
+                genero: document.getElementById('new_pac_genero').value,
+                prevision: document.getElementById('new_pac_prevision').value,
+                alergias: "Ninguna" 
+            };
+
+            try {
+                const resp = await fetch(`${urlBaseApi}/his/pacientes/`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify(payloadPaciente)
+                });
+
+                if (!resp.ok) throw new Error("Error al crear paciente");
+
+                const nuevoPaciente = await resp.json();
+                
+                seccionCrearPaciente.style.display = 'none';
+                inputNombreDisplay.value = `${nuevoPaciente.nombre} ${nuevoPaciente.apellido} (NUEVO)`;
+                inputPacienteIdHidden.value = nuevoPaciente.id;
+                mensaje.textContent = "Paciente registrado y seleccionado.";
+                mensaje.style.color = "green";
+
+            } catch (error) {
+                alert("Error al registrar paciente: " + error.message);
+            }
+        });
+
+
         let catalogoDisponible = []; 
 
         async function cargarDatosIniciales() {
@@ -164,14 +231,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
 
                 const respCatalogo = await fetch(`${urlBaseApi}/catalogo/`, { headers });
-                if (!respCatalogo.ok) throw new Error('Error al cargar catalogo de medicamentos.');
+                if (!respCatalogo.ok) throw new Error('Error al cargar catalogo.');
                 catalogoDisponible = await respCatalogo.json();
                 
                 inputFecha.value = new Date().toISOString().split('T')[0];
                 agregarLineaMedicamento(); 
             } catch (error) {
-                mensaje.textContent = `Error al cargar datos: ${error.message}`;
-                mensaje.style.color = 'red';
+                mensaje.textContent = `Error: ${error.message}`;
             }
         }
         
@@ -181,7 +247,6 @@ document.addEventListener('DOMContentLoaded', () => {
             
             const selectMedicamento = document.createElement('select');
             selectMedicamento.required = true;
-            
             selectMedicamento.innerHTML = '<option value="">Seleccione un medicamento...</option>';
             catalogoDisponible.forEach(c => {
                 const option = document.createElement('option');
@@ -213,13 +278,14 @@ document.addEventListener('DOMContentLoaded', () => {
         formularioReceta.addEventListener('submit', async (e) => {
             e.preventDefault();
             mensaje.textContent = '';
-            const detallesItems = contenedorDetalles.querySelectorAll('.detalle-item');
-            if (detallesItems.length === 0) {
-                mensaje.textContent = 'Debe agregar al menos un medicamento.';
-                mensaje.style.color = 'red';
+            
+            const pacienteId = inputPacienteIdHidden.value;
+            if (!pacienteId) {
+                alert("Debe buscar y validar un paciente antes de crear la receta.");
                 return;
             }
-            
+
+            const detallesItems = contenedorDetalles.querySelectorAll('.detalle-item');
             const detallesPayload = [];
             
             detallesItems.forEach(item => {
@@ -237,13 +303,13 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             if (detallesPayload.length === 0) {
-                mensaje.textContent = 'Debe seleccionar un medicamento valido.';
+                mensaje.textContent = 'Agregue al menos un medicamento.';
                 mensaje.style.color = 'red';
                 return;
             }
 
             const recetaPayload = {
-                id_paciente: document.getElementById('id_paciente').value,
+                paciente_id: parseInt(pacienteId), 
                 profesional_id: parseInt(selectProfesional.value),
                 fecha_emision: inputFecha.value,
                 detalles: detallesPayload 
@@ -257,15 +323,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
                 if (!respuesta.ok) {
                     const errorData = await respuesta.json();
-                    throw new Error(errorData.detail || 'Error al registrar la receta.');
+                    throw new Error(errorData.detail || 'Error al registrar.');
                 }
                 const nuevaReceta = await respuesta.json();
-                mensaje.textContent = `¡Receta #${nuevaReceta.id} registrada exitosamente!`;
+                mensaje.textContent = `¡Receta #${nuevaReceta.id} registrada!`;
                 mensaje.style.color = 'green';
-                formularioReceta.reset();
-                contenedorDetalles.innerHTML = '';
                 
-                await cargarDatosIniciales();
+                contenedorDetalles.innerHTML = '';
+                agregarLineaMedicamento();
+                inputRutBusqueda.value = "";
+                inputRutBusqueda.readOnly = false;
+                inputNombreDisplay.value = "";
+                inputPacienteIdHidden.value = "";
                 
             } catch (error) {
                 mensaje.textContent = error.message;
@@ -277,7 +346,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
 
-    // --- LOGICA PANEL DE ADMIN ---
+    // --- LOGICA DEL PANEL DE ADMINISTRADOR ---
     const panelAdmin = document.getElementById('contenido-admin');
     if (panelAdmin) {
         if (!token || rol !== "administrador") {
@@ -298,7 +367,6 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
         
-        // --- Navegacion ---
         document.getElementById('btn-cuentas').addEventListener('click', cargarVistaCuentas);
         document.getElementById('btn-profesionales').addEventListener('click', cargarVistaProfesionales);
         document.getElementById('btn-catalogo').addEventListener('click', cargarVistaCatalogo);
@@ -311,7 +379,7 @@ document.addEventListener('DOMContentLoaded', () => {
             window.location.href = 'index.html';
         });
         
-        // --- VISTA 1: GESTION DE CUENTAS ---
+        // --- 1. Gestion Cuentas ---
         function cargarVistaCuentas() {
             setBotonActivo('btn-cuentas');
             panelAdmin.innerHTML = `
@@ -344,7 +412,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             <input type="text" id="new-username" required>
                         </div>
                         <div class="form-group">
-                            <label for="new-password">Contraseña</label>
+                            <label for="new-password">Contrasena</label>
                             <input type="password" id="new-password" required>
                         </div>
                         <div class="form-group">
@@ -427,7 +495,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        // --- VISTA 2: PROFESIONALES ---
+        // --- 2. Gestion Profesionales ---
         function cargarVistaProfesionales() {
             setBotonActivo('btn-profesionales');
             panelAdmin.innerHTML = `
@@ -508,7 +576,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const err = await respuesta.json();
                     throw new Error(err.detail || 'Error al crear profesional.');
                 }
-                mensaje.textContent = 'Profesional creado con éxito.';
+                mensaje.textContent = 'Profesional creado con exito.';
                 mensaje.style.color = 'green';
                 document.getElementById('prof-create-form').reset();
                 buscarProfesionales(true);
@@ -525,62 +593,63 @@ document.addEventListener('DOMContentLoaded', () => {
                     const err = await respuesta.json();
                     throw new Error(err.detail || 'Error al eliminar profesional.');
                 }
-                alert('Profesional eliminado con éxito.');
+                alert('Profesional eliminado con exito.');
                 buscarProfesionales(true);
             } catch (error) {
                 alert(error.message);
             }
         }
         
-        // --- VISTA 3: CATÁLOGO (IA Pasiva) ---
-        function cargarVistaCatalogo() {
-            setBotonActivo('btn-catalogo');
-            panelAdmin.innerHTML = `
-                <h1>Catálogo de medicamentos (Panel Inteligente)</h1>
-                <p>Panel de estado del inventario.</p>
-                <div class="admin-seccion">
-                    <h2>Catalogo y Estado de Stock</h2>
-                    <table class="admin-table" id="tabla-catalogo-ia">
-                        <thead>
-                            <tr>
-                                <th>ID</th>
-                                <th>Nombre (Medicamento)</th>
-                                <th>Stock Total Actual</th>
-                                <th>Demanda Estimada (30 dias)</th>
-                                <th>Estado (proporcinado por IA)</th>
-                                <th>Accion</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr><td colspan="6">Cargando datos de IA...</td></tr>
-                        </tbody>
-                    </table>
+        // --- 3. Catalogo ---
+        // EN app.js
+
+function cargarVistaCatalogo() {
+    setBotonActivo('btn-catalogo');
+    panelAdmin.innerHTML = `
+        <h1>Catalogo de medicamentos (Panel Inteligente)</h1>
+        <p>Panel de estado del inventario.</p>
+        <div class="admin-seccion">
+            <h2>Catalogo y Estado de Stock</h2>
+            <table class="admin-table" id="tabla-catalogo-ia">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Nombre (Medicamento)</th>
+                        <th>Stock Total Actual</th>
+                        <th>Demanda Estimada (Semanal)</th> <th>Estado (IA)</th>
+                        <th>Accion</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td colspan="6">Cargando datos de IA...</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="admin-seccion">
+            <h2>Crear Nuevo Item de Catalogo</h2>
+            <form id="cat-create-form" class="form-grid">
+                <div class="form-group">
+                    <label for="new-cat-nombre">Nombre (Unico)</label>
+                    <input type="text" id="new-cat-nombre" required>
                 </div>
-                <div class="admin-seccion">
-                    <h2>Crear Nuevo Item de Catalogo</h2>
-                    <form id="cat-create-form" class="form-grid">
-                        <div class="form-group">
-                            <label for="new-cat-nombre">Nombre (Unico)</label>
-                            <input type="text" id="new-cat-nombre" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="new-cat-desc">Descripcion (Opcional)</label>
-                            <input type="text" id="new-cat-desc">
-                        </div>
-                        <button type="submit" class="btn-submit-admin">Crear en Catalogo</button>
-                    </form>
-                    <p id="admin-mensaje"></p>
+                <div class="form-group">
+                    <label for="new-cat-desc">Descripcion (Opcional)</label>
+                    <input type="text" id="new-cat-desc">
                 </div>
-            `;
-            
-            document.getElementById('cat-create-form').addEventListener('submit', crearItemCatalogo);
-            buscarCatalogoDashboard();
-        }
+                <button type="submit" class="btn-submit-admin">Crear en Catalogo</button>
+            </form>
+            <p id="admin-mensaje"></p>
+        </div>
+    `;
+    
+    document.getElementById('cat-create-form').addEventListener('submit', crearItemCatalogo);
+    buscarCatalogoDashboard();
+}
         async function buscarCatalogoDashboard() {
             const tablaBody = document.querySelector('#tabla-catalogo-ia tbody');
             try {
-                const respuesta = await fetch(`${urlBaseApi}/catalogo/dashboard/`, { headers });
-                if (!respuesta.ok) throw new Error('Error al buscar catálogo inteligente.');
+                const respuesta = await fetch(`${urlBaseApi}/catalogo/`, { headers }); // OJO: Endpoint catalogo normal si dashboard no existe, o dashboard si implementado
+                if (!respuesta.ok) throw new Error('Error al buscar catalogo inteligente.');
                 const catalogoItems = await respuesta.json();
                 
                 tablaBody.innerHTML = '';
@@ -591,20 +660,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 catalogoItems.forEach(c => {
                     let estadoClass = "estado-ia-datos";
-                    if (c.estado_ia === "OK") {
+                    if (c.estado_ia === "OPTIMO") {
                         estadoClass = "estado-ia-ok";
-                    } else if (c.estado_ia === "REQUIERE PEDIDO") {
+                    } else if (c.estado_ia === "STOCK_BAJO" || c.estado_ia === "STOCK_CRITICO_PROYECTADO") {
                         estadoClass = "estado-ia-requiere";
                     }
-                    const demandaTexto = c.demanda_estimada_30_dias !== null ? c.demanda_estimada_30_dias.toFixed(0) : 'N/A';
+                    const demandaTexto = c.demanda_estimada_30_dias !== null ? c.demanda_estimada_30_dias : 'N/A';
                     
                     tablaBody.innerHTML += `
                         <tr>
                             <td>${c.id}</td>
                             <td>${c.nombre}</td>
-                            <td>${c.stock_total}</td>
+                            <td>${c.stock_total || 0}</td>
                             <td>${demandaTexto}</td>
-                            <td class="${estadoClass}">${c.estado_ia}</td>
+                            <td class="${estadoClass}">${c.estado_ia || 'SIN_DATOS'}</td>
                             <td><button class="btn-eliminar" data-id="${c.id}">Eliminar</button></td>
                         </tr>
                     `;
@@ -660,16 +729,16 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        // --- VISTA 4: UBICACIONES (para el kardex)---
+        // --- 4. Ubicaciones ---
         async function cargarVistaUbicaciones() {
             setBotonActivo('btn-ubicaciones');
             panelAdmin.innerHTML = `
-                <h1>Gestión de Ubicaciones Físicas</h1>
+                <h1>Gestion de Ubicaciones Fisicas</h1>
                 <p>Creacion de los espacios fisicos del kardex (ej. A05) que se asocian a un item del catalogo.</p>
                 <div class="admin-seccion">
                     <h2>Ubicaciones Existentes</h2>
                     <table class="admin-table">
-                        <thead><tr><th>ID (Ubic.)</th><th>Nombre (Catálogo)</th><th>Ubicación</th><th>Lote</th><th>Vencimiento</th><th>Stock</th><th>Umbral</th><th>Accion</th></tr></thead>
+                        <thead><tr><th>ID (Ubic.)</th><th>Nombre (Catalogo)</th><th>Ubicacion</th><th>Lote</th><th>Vencimiento</th><th>Stock</th><th>Umbral</th><th>Accion</th></tr></thead>
                         <tbody></tbody>
                     </table>
                 </div>
@@ -763,7 +832,7 @@ document.addEventListener('DOMContentLoaded', () => {
             
             const ubicacionRegex = /^[A-R][0-9]+$/; 
             if (!ubicacionRegex.test(ubicacionInput)) {
-                mensaje.textContent = 'Error: El formato de ubicación es invalido. Debe ser una letra (A-R) seguida de números (ej. A01, C23, K10).';
+                mensaje.textContent = 'Error: El formato de ubicacion es invalido. Debe ser una letra (A-R) seguida de numeros (ej. A01, C23, K10).';
                 mensaje.style.color = 'red';
                 return;
             }
@@ -798,7 +867,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const err = await respuesta.json();
                     let errorMsg = err.detail || 'Error al crear ubicacion.';
                     if (errorMsg.includes("ubicacion")) { 
-                        errorMsg = "Error: Esa ubicación ya esta ocupada por otro medicamento.";
+                        errorMsg = "Error: Esa ubicacion ya esta ocupada por otro medicamento.";
                     }
                     throw new Error(errorMsg);
                 }
@@ -812,7 +881,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
         async function eliminarUbicacion(id) {
-            if (!confirm(`¿Estas seguro de que quieres eliminar esta ubicación (ID ${id})?\nEsta accion no se puede deshacer.`)) {
+            if (!confirm(`¿Estas seguro de que quieres eliminar esta ubicacion (ID ${id})?\nEsta accion no se puede deshacer.`)) {
                 return;
             }
             try {
@@ -824,21 +893,21 @@ document.addEventListener('DOMContentLoaded', () => {
                     const err = await respuesta.json();
                     throw new Error(err.detail || 'Error al eliminar ubicacion.');
                 }
-                alert('Ubicación eliminada con exito.');
+                alert('Ubicacion eliminada con exito.');
                 buscarUbicaciones(); 
             } catch (error) {
                 alert(error.message);
             }
         }
         
-        // --- VISTA 5: PEDIDOS ---
+        // --- 5. Pedidos ---
         function cargarVistaCrearPedido() {
             setBotonActivo('btn-crear-pedido');
             const hoy = new Date().toISOString().split('T')[0];
             
             panelAdmin.innerHTML = `
                 <h1>Crear Pedido a Bodega (Asistente IA)</h1>
-                <p>Cree un nuevo pedido para la bodega central. Puede usar el asistente de IA para autocompletar el pedido con los medicamentos que (segun la prediccion de la ia) se necesitaran en los proximos 30 días.</p>           
+                <p>Cree un nuevo pedido para la bodega central. Puede usar el asistente de IA para autocompletar el pedido con los medicamentos que (segun la prediccion de la ia) se necesitaran en los proximos 30 dias.</p>           
                 <form id="form-crear-pedido">
                     <div class="admin-seccion">
                         <h2>1. Descripcion del Pedido</h2>
@@ -871,39 +940,50 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('btn-ia-autocompletar').addEventListener('click', autocompletarPedidoIA);
             document.getElementById('form-crear-pedido').addEventListener('submit', enviarPedidoBodega);
         }
-        async function autocompletarPedidoIA() {
-            const boton = document.getElementById('btn-ia-autocompletar');
-            const mensaje = document.getElementById('ia-pedido-mensaje');
-            const contenedor = document.getElementById('contenedor-detalles-pedido');
-            boton.textContent = 'Consultar IA...';
-            boton.disabled = true;
-            mensaje.textContent = '';
-            try {
-                const respuesta = await fetch(`${urlBaseApi}/ia/sugerencias-pedido/`, { headers });
-                if (!respuesta.ok) {
-                    const err = await respuesta.json();
-                    throw new Error(err.detail || 'Error al obtener sugerencias de IA.');
-                }
-                const sugerencias = await respuesta.json();
-                contenedor.innerHTML = ''; 
-                if (sugerencias.length === 0) {
-                    mensaje.textContent = 'La IA no tiene sugerencias. El stock parece esta al dia segun la demanda de hoy';
-                    mensaje.style.color = 'green';
-                    return;
-                }
-                sugerencias.forEach(sug => {
-                    agregarLineaPedido(sug.catalogo_id, sug.nombre_medicamento, Math.ceil(sug.cantidad_sugerida_a_pedir));
-                });
-                mensaje.textContent = `Se añadieron ${sugerencias.length} medicamentos al pedido. Revise las cantidades y envie.`;
-                mensaje.style.color = 'green';
-            } catch (error) {
-                mensaje.textContent = `Error: ${error.message}`;
-                mensaje.style.color = 'red';
-            } finally {
-                boton.textContent = 'Autocompletar Pedido con Sugerencias de IA';
-                boton.disabled = false;
-            }
+        // EN app.js
+
+async function autocompletarPedidoIA() {
+    const boton = document.getElementById('btn-ia-autocompletar');
+    const mensaje = document.getElementById('ia-pedido-mensaje');
+    const contenedor = document.getElementById('contenedor-detalles-pedido');
+    boton.textContent = 'Consultar IA...';
+    boton.disabled = true;
+    mensaje.textContent = '';
+    try {
+        const respuesta = await fetch(`${urlBaseApi}/catalogo/`, { headers });
+        if (!respuesta.ok) throw new Error('Error al consultar datos.');
+        const catalogo = await respuesta.json();
+        
+        // Filtramos items criticos o bajos
+        const sugerencias = catalogo.filter(c => c.estado_ia === 'STOCK_BAJO' || c.estado_ia === 'STOCK_CRITICO_PROYECTADO');
+        
+        contenedor.innerHTML = ''; 
+        if (sugerencias.length === 0) {
+            mensaje.textContent = 'La IA no tiene sugerencias urgentes para esta semana. El stock parece saludable.';
+            mensaje.style.color = 'green';
+            return;
         }
+        sugerencias.forEach(sug => {
+            // CALCULO SEMANAL:
+            // sug.demanda_estimada_30_dias ahora trae el valor de 7 dias (desde el backend).
+            // Multiplicamos por 1.5 para cubrir la semana + 3.5 dias de margen de seguridad (10.5 dias total).
+            let cantidad = 50;
+            if (sug.demanda_estimada_30_dias) {
+                 cantidad = Math.ceil(sug.demanda_estimada_30_dias * 1.5);
+            }
+            
+            agregarLineaPedido(sug.id, sug.nombre, cantidad);
+        });
+        mensaje.textContent = `Se anadieron ${sugerencias.length} medicamentos sugeridos para cubrir la demanda semanal.`;
+        mensaje.style.color = 'green';
+    } catch (error) {
+        mensaje.textContent = `Error: ${error.message}`;
+        mensaje.style.color = 'red';
+    } finally {
+        boton.textContent = 'Autocompletar Pedido (Sugerencia Semanal)';
+        boton.disabled = false;
+    }
+}
         function agregarLineaPedido(catalogoId, nombre, cantidad) {
             const contenedor = document.getElementById('contenedor-detalles-pedido');
             const itemDiv = document.createElement('div');
@@ -933,12 +1013,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const descripcion = document.getElementById('pedido-descripcion').value;
             const itemsPedido = document.querySelectorAll('#contenedor-detalles-pedido .pedido-item');
             if (!descripcion) {
-                mensaje.textContent = 'Debe añadir una descripcion al pedido.';
+                mensaje.textContent = 'Debe anadir una descripcion al pedido.';
                 mensaje.style.color = 'red';
                 return;
             }
             if (itemsPedido.length === 0) {
-                mensaje.textContent = 'Debe añadir al menos un medicamento al pedido.';
+                mensaje.textContent = 'Debe anadir al menos un medicamento al pedido.';
                 mensaje.style.color = 'red';
                 return;
             }
@@ -980,7 +1060,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        // --- ¡VISTA 6 incidencias de kardex y estado---
+        // --- 6. INCIDENCIAS (KARDEX) - CORREGIDO ---
         function cargarVistaIncidencias() {
             setBotonActivo('btn-gestion-kardex');
             panelAdmin.innerHTML = `
@@ -997,7 +1077,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 <th>Fecha Reporte</th>
                                 <th>Reportado Por</th>
                                 <th>Descripcion de Falla</th>
-                                <th>Acción</th>
+                                <th>Accion</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -1006,7 +1086,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     </table>
                 </div>
 
-                <!-- Formulario para Resolver (se muestra al hacer clic) -->
                 <div id="form-resolver-seccion" class="admin-seccion" style="display:none;">
                     <h2>Resolver Incidencia <span id="resolver-incidencia-id"></span></h2>
                     <div class="incidencia-reporte-bloque">
@@ -1048,11 +1127,10 @@ document.addEventListener('DOMContentLoaded', () => {
         async function buscarIncidencias() {
             const tablaBody = document.querySelector('#tabla-incidencias-abiertas tbody');
             try {
-                // Busca las incidencias abiertas
                 const respuesta = await fetch(`${urlBaseApi}/kardex/incidencias/?estado=abierta`, { headers });
                 if (!respuesta.ok) throw new Error('Error al buscar incidencias.');
                 
-                cacheIncidencias = await respuesta.json(); // Guardar en cache
+                cacheIncidencias = await respuesta.json(); 
                 
                 tablaBody.innerHTML = '';
                 if (cacheIncidencias.length === 0) {
@@ -1061,15 +1139,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 
                 cacheIncidencias.forEach(inc => {
-                    // Formatea fecha
                     const fecha = new Date(inc.fecha_reporte).toLocaleString('es-CL');
-                    
+                    // FIX: Manejo seguro de nulos si el usuario fue borrado
+                    const nombreUsuario = inc.usuario_reporta ? inc.usuario_reporta.nombre_usuario : 'Sistema/Eliminado';
+
                     tablaBody.innerHTML += `
                         <tr>
                             <td>${inc.id}</td>
                             <td>${inc.kardex.identificador} (${inc.kardex.nombre})</td>
                             <td>${fecha}</td>
-                            <td>${inc.usuario_reporta.nombre_usuario}</td>
+                            <td>${nombreUsuario}</td>
                             <td>${inc.reporte_operario}</td>
                             <td><button class="btn-resolver" data-id="${inc.id}">Resolver</button></td>
                         </tr>
@@ -1079,7 +1158,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.querySelectorAll('.btn-resolver').forEach(btn => {
                     btn.addEventListener('click', (e) => {
                         const id = e.target.dataset.id;
-                        // Busca la incidencia en el cach
                         const incidencia = cacheIncidencias.find(i => i.id == id);
                         if (incidencia) {
                             mostrarFormularioResolver(incidencia);
@@ -1097,7 +1175,6 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('resolver-reporte-texto').textContent = incidencia.reporte_operario;
             document.getElementById('resolver-id-hidden').value = incidencia.id;
             
-            // Limpiar campos
             document.getElementById('resolver-respuesta').value = '';
             document.getElementById('resolver-fecha-programada').value = '';
             document.getElementById('resolver-estado').value = 'en_mantencion';
@@ -1128,8 +1205,9 @@ document.addEventListener('DOMContentLoaded', () => {
             mensaje.textContent = '';
             
             try {
+                // FIX: Cambiado de PUT a POST para coincidir con el backend
                 const respuesta = await fetch(`${urlBaseApi}/kardex/incidencias/${incidenciaId}/resolver/`, {
-                    method: 'PUT',
+                    method: 'POST', 
                     headers: headers,
                     body: JSON.stringify(payload)
                 });
@@ -1142,7 +1220,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 mensaje.textContent = 'Incidencia actualizada exitosamente';
                 mensaje.style.color = 'green';
                 
-                // Ocultar el formulario y recargar la lista
                 document.getElementById('form-resolver-seccion').style.display = 'none';
                 await buscarIncidencias();
 
@@ -1150,12 +1227,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 mensaje.textContent = `Error: ${error.message}`;
                 mensaje.style.color = 'red';
             } finally {
-                boton.textContent = 'Guardar Resolución';
+                boton.textContent = 'Guardar Resolucion';
                 boton.disabled = false;
             }
         }
 
-        // --- VISTA 7: REPORTES ---
+        // --- 7. Reportes ---
         function cargarVistaReportes() {
             setBotonActivo('btn-reportes'); 
             const hoy = new Date().toISOString().split('T')[0];
@@ -1185,7 +1262,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 <div class="admin-seccion">
                     <h2>Reporte de Auditoria del Sistema</h2>
-                    <p>Contiene un registro completo de todas las acciones (logins, creación de usuarios, recetas, errores, etc.).</p>
+                    <p>Contiene un registro completo de todas las acciones (logins, creacion de usuarios, recetas, errores, etc.).</p>
                     <form id="form-reporte-auditoria" class="form-grid">
                         <div class="form-group">
                             <label for="audit-fecha-inicio">Fecha de Inicio</label>
@@ -1297,7 +1374,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
         
-        // Carga la vista de cuentas por defecto al iniciar
         cargarVistaCuentas();
     }
 });
